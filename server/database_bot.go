@@ -16,9 +16,11 @@ import (
 	neturl "net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/hkdf"
@@ -300,8 +302,22 @@ var serverWrapKeys = newWrapKeyStore()
 const (
 	passChars             = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
 	generatedPasswordLen  = 16
-	maxGeneratedPasswords = 10
+	maxGeneratedPasswords = 200
+	// passwordsPerPage — сколько доступов показывать в одном сообщении бота.
+	// Весь список одним сообщением при сотнях паролей отправить нельзя:
+	// Telegram жёстко режет текст на 4096 символах, а inline-клавиатура здесь
+	// получает по кнопке на каждый пароль. 20 строк — с запасом по обоим лимитам.
+	passwordsPerPage = 20
 )
+
+// telegramHTTPClient — общий клиент для вызовов Bot API. Отдельный от клиента
+// long-polling в botLoop: у того таймаут 65с под getUpdates.
+var telegramHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
+// listPageMemory — страница списка доступов, показанная админу последней.
+// Нужна, чтобы кнопка «К списку» из карточки пароля возвращала туда, откуда
+// пришли, а не на первую страницу из двадцати.
+var listPageMemory atomic.Int32
 
 func generatePassword() (string, error) {
 	b := make([]byte, generatedPasswordLen)
@@ -325,6 +341,55 @@ func passwordEntryLabel(entry *PasswordEntry, pass string, index int) string {
 		return fmt.Sprintf("Доступ …%s", pass[len(pass)-4:])
 	}
 	return fmt.Sprintf("Доступ #%d", index)
+}
+
+// labelSortKey разбивает подпись на текстовую часть и завершающее число, чтобы
+// «Доступ 2» шёл перед «Доступ 10», а не после, как при обычном сравнении строк.
+// На двух сотнях доступов лексикографический порядок читать невозможно.
+func labelSortKey(label string) (string, int64, bool) {
+	trimmed := strings.TrimRight(label, "0123456789")
+	digits := label[len(trimmed):]
+	if digits == "" || len(digits) > 18 {
+		return label, 0, false
+	}
+	n, err := strconv.ParseInt(digits, 10, 64)
+	if err != nil {
+		return label, 0, false
+	}
+	return trimmed, n, true
+}
+
+// sortedPasswordsLocked возвращает пароли в стабильном читаемом порядке.
+// Стабильность обязательна для постраничного вывода: обход map в Go
+// намеренно рандомизирован, и без сортировки соседние страницы пересекались бы
+// между собой и теряли записи. Вызывать под dbMutex.
+func sortedPasswordsLocked() []string {
+	passwords := make([]string, 0, len(db.Passwords))
+	for pass := range db.Passwords {
+		passwords = append(passwords, pass)
+	}
+	// Сначала детерминированный базовый порядок — от него зависит нумерация
+	// в passwordEntryLabel для записей без собственной подписи.
+	sort.Strings(passwords)
+
+	labels := make(map[string]string, len(passwords))
+	for i, pass := range passwords {
+		labels[pass] = passwordEntryLabel(db.Passwords[pass], pass, i+1)
+	}
+
+	sort.SliceStable(passwords, func(i, j int) bool {
+		li, lj := labels[passwords[i]], labels[passwords[j]]
+		if li != lj {
+			pi, ni, oki := labelSortKey(li)
+			pj, nj, okj := labelSortKey(lj)
+			if oki && okj && pi == pj {
+				return ni < nj
+			}
+			return li < lj
+		}
+		return passwords[i] < passwords[j]
+	})
+	return passwords
 }
 
 func nextPasswordLabel() string {
@@ -1046,6 +1111,19 @@ func botLoop(token string, adminIDstr string, wgDev *device.Device) {
 					dbMutex.Unlock()
 					sendTelegram(token, adminID, fmt.Sprintf("✅ Устройство `%s` удалено", devID), nil)
 
+				} else if strings.HasPrefix(data, "listpage_") {
+					page, err := strconv.Atoi(strings.TrimPrefix(data, "listpage_"))
+					if err != nil {
+						page = 0
+					}
+					sendPasswordListPage(token, adminID, wgDev, page)
+
+				} else if data == "listdump" {
+					sendPasswordListFile(token, adminID)
+
+				} else if data == "listnoop" {
+					// Индикатор «стр. N/M» — кнопка без действия.
+
 				} else if data == "backlist" {
 					sendPasswordList(token, adminID, wgDev)
 				}
@@ -1361,35 +1439,83 @@ func syncPersistedPeersToWG(wgDev *device.Device) {
 	}
 }
 
+// pageBounds приводит номер страницы к допустимому диапазону и возвращает
+// границы среза [first, last) для неё. Вынесено из sendPasswordListPage
+// отдельной чистой функцией: именно здесь легче всего ошибиться на единицу,
+// а цена ошибки — пропущенные или задвоенные доступы в выдаче бота.
+//
+// page за пределами диапазона прижимается к краю, пустой список даёт одну
+// пустую страницу (first == last == 0).
+func pageBounds(total, perPage, page int) (clampedPage, pages, first, last int) {
+	if perPage < 1 {
+		perPage = 1
+	}
+	pages = (total + perPage - 1) / perPage
+	if pages < 1 {
+		pages = 1
+	}
+	if page >= pages {
+		page = pages - 1
+	}
+	if page < 0 {
+		page = 0
+	}
+	first = page * perPage
+	if first > total {
+		first = total
+	}
+	last = first + perPage
+	if last > total {
+		last = total
+	}
+	return page, pages, first, last
+}
+
 func sendPasswordList(token string, adminID int64, wgDev *device.Device) {
+	sendPasswordListPage(token, adminID, wgDev, int(listPageMemory.Load()))
+}
+
+func sendPasswordListPage(token string, adminID int64, wgDev *device.Device, page int) {
 	dbMutex.Lock()
-	defer dbMutex.Unlock()
 
 	// Очистка истёкших
 	if cleanupExpiredPasswordsLocked(wgDev) > 0 {
 		saveDB()
 	}
 
+	passwords := sortedPasswordsLocked()
+	total := len(passwords)
+	page, pages, first, last := pageBounds(total, passwordsPerPage, page)
+	listPageMemory.Store(int32(page))
+
 	txt := "🔐 *Пароли:*\n\n"
 	txt += fmt.Sprintf("🔒 Главный: `%s` (владелец)\n\n", db.MainPassword)
 
-	var inlineKb []map[string]interface{}
-	inlineKb = append(inlineKb, map[string]interface{}{
-		"text":          "🔗 Ссылка на главный пароль",
-		"callback_data": "mainlink",
-	})
+	keyboard := [][]map[string]interface{}{{
+		{"text": "🔗 Ссылка на главный пароль", "callback_data": "mainlink"},
+	}}
 
-	if len(db.Passwords) == 0 {
+	if total == 0 {
 		txt += "_Нет сгенерированных паролей._\n"
 	} else {
-		txt += fmt.Sprintf("_Активно: %d/%d_\n\n", len(db.Passwords), maxGeneratedPasswords)
-		index := 0
-		for p, entry := range db.Passwords {
-			index++
-			label := passwordEntryLabel(entry, p, index)
+		txt += fmt.Sprintf("_Активно: %d/%d", total, maxGeneratedPasswords)
+		if pages > 1 {
+			txt += fmt.Sprintf(" · показаны %d–%d, стр. %d/%d", first+1, last, page+1, pages)
+		}
+		txt += "_\n\n"
+
+		for i := first; i < last; i++ {
+			pass := passwords[i]
+			entry := db.Passwords[pass]
+			label := passwordEntryLabel(entry, pass, i+1)
 			status := "🟢"
 			if entry.DeviceID != "" || len(entry.DeviceIDs) > 0 {
 				status = "🔗"
+			}
+			// Деактивированный доступ не работает, но слот из лимита занимает —
+			// без метки его не отличить от свободного.
+			if entry.IsDeactivated {
+				status = "⛔"
 			}
 			expiry := "♾"
 			if entry.ExpiresAt > 0 {
@@ -1401,31 +1527,117 @@ func sendPasswordList(token string, adminID int64, wgDev *device.Device) {
 				}
 			}
 			txt += fmt.Sprintf("%s *%s* (%s)\n", status, label, expiry)
-			inlineKb = append(inlineKb, map[string]interface{}{
-				"text":          "🔍 " + label,
-				"callback_data": "viewpass_" + p,
+			keyboard = append(keyboard, []map[string]interface{}{
+				{"text": "🔍 " + label, "callback_data": "viewpass_" + pass},
+			})
+		}
+
+		if pages > 1 {
+			var nav []map[string]interface{}
+			if page > 0 {
+				nav = append(nav, map[string]interface{}{
+					"text":          "‹ Назад",
+					"callback_data": fmt.Sprintf("listpage_%d", page-1),
+				})
+			}
+			nav = append(nav, map[string]interface{}{
+				"text":          fmt.Sprintf("%d/%d", page+1, pages),
+				"callback_data": "listnoop",
+			})
+			if page < pages-1 {
+				nav = append(nav, map[string]interface{}{
+					"text":          "Вперёд ›",
+					"callback_data": fmt.Sprintf("listpage_%d", page+1),
+				})
+			}
+			keyboard = append(keyboard, nav)
+			keyboard = append(keyboard, []map[string]interface{}{
+				{"text": "📄 Весь список файлом", "callback_data": "listdump"},
 			})
 		}
 	}
 
-	txt += "\n🟢 = свободен | 🔗 = привязан"
+	// Сеть — уже без блокировки БД.
+	dbMutex.Unlock()
 
-	var replyMarkup interface{}
-	if len(inlineKb) > 0 {
-		var keyboard [][]map[string]interface{}
-		for _, btn := range inlineKb {
-			keyboard = append(keyboard, []map[string]interface{}{btn})
+	txt += "\n🟢 = свободен | 🔗 = привязан | ⛔ = отключён"
+
+	sendTelegram(token, adminID, txt, map[string]interface{}{"inline_keyboard": keyboard})
+}
+
+// sendPasswordListFile выгружает полный список доступов текстовым файлом.
+// На сотнях паролей это единственный способ увидеть всё сразу и поискать
+// нужный: в одно сообщение Telegram столько не помещается.
+func sendPasswordListFile(token string, adminID int64) {
+	dbMutex.Lock()
+	passwords := sortedPasswordsLocked()
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "qWDTT — доступы на %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(&b, "Активно: %d из %d\n\n", len(passwords), maxGeneratedPasswords)
+
+	for i, pass := range passwords {
+		entry := db.Passwords[pass]
+		expiry := "бессрочно"
+		if entry.ExpiresAt > 0 {
+			expiry = time.Unix(entry.ExpiresAt, 0).Format("2006-01-02")
+			if isPasswordExpired(entry) {
+				expiry += " (истёк)"
+			}
 		}
-		replyMarkup = map[string]interface{}{"inline_keyboard": keyboard}
+		state := "активен"
+		if entry.IsDeactivated {
+			state = "отключён"
+		}
+		maxDevs := entry.MaxDevices
+		if maxDevs <= 0 {
+			maxDevs = 1
+		}
+		fmt.Fprintf(&b, "%3d. %s\n", i+1, passwordEntryLabel(entry, pass, i+1))
+		fmt.Fprintf(&b, "     пароль:    %s\n", pass)
+		fmt.Fprintf(&b, "     состояние: %s, действует до %s\n", state, expiry)
+		fmt.Fprintf(&b, "     устройств: %d из %d\n", len(entryDeviceIDs(entry)), maxDevs)
+		fmt.Fprintf(&b, "     трафик:    ↓%.2f MB / ↑%.2f MB\n",
+			float64(entry.DownBytes)/(1024*1024), float64(entry.UpBytes)/(1024*1024))
+		if entry.VkHash != "" {
+			fmt.Fprintf(&b, "     vk_hash:   %s\n", entry.VkHash)
+		}
+		b.WriteString("\n")
 	}
-	sendTelegram(token, adminID, txt, replyMarkup)
+	dbMutex.Unlock()
+
+	sendTelegramFile(token, adminID, "wdtt-passwords.txt", []byte(b.String()))
 }
 
 func answerCallback(token, callbackID string) {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/answerCallbackQuery", token)
 	payload := map[string]interface{}{"callback_query_id": callbackID}
 	body, _ := json.Marshal(payload)
-	http.Post(url, "application/json", bytes.NewBuffer(body))
+	postTelegram(url, body, "answerCallbackQuery")
+}
+
+// postTelegram отправляет запрос в Bot API и разбирает ответ.
+//
+// Раньше результат http.Post здесь просто отбрасывался: тело ответа не
+// закрывалось (утечка соединения), а любой отказ Telegram — например
+// отклонённое слишком длинное сообщение — проходил совершенно молча. Внешне
+// это выглядело как «команда не сработала», без единой строчки в логе.
+func postTelegram(url string, body []byte, what string) {
+	resp, err := telegramHTTPClient.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[BOT] %s: ошибка запроса: %v", what, err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		log.Printf("[BOT] %s: Telegram ответил %d: %s",
+			what, resp.StatusCode, bytes.TrimSpace(respBody))
+		return
+	}
+	// Дочитываем тело, чтобы соединение вернулось в пул keep-alive.
+	_, _ = io.Copy(io.Discard, resp.Body)
 }
 
 func maskPassword(pass string) string {
@@ -1446,7 +1658,7 @@ func sendTelegram(token string, chatID int64, text string, replyMarkup interface
 		payload["reply_markup"] = replyMarkup
 	}
 	body, _ := json.Marshal(payload)
-	http.Post(url, "application/json", bytes.NewBuffer(body))
+	postTelegram(url, body, "sendMessage")
 }
 
 func sendTelegramFile(token string, chatID int64, fileName string, fileContent []byte) {
@@ -1481,8 +1693,7 @@ func sendTelegramFile(token string, chatID int64, fileName string, fileContent [
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := telegramHTTPClient.Do(req)
 	if err != nil {
 		log.Println("[BOT] Error sending file to Telegram:", err)
 		return
