@@ -2,6 +2,9 @@
 .gradle/
 build/
 local.properties
+# Критерий JVM для демона: описывает машину сборщика, а не проект.
+# Android Studio регенерирует его при апгрейде AGP.
+gradle/gradle-daemon-jvm.properties
 
 # ===== Android =====
 *.apk
