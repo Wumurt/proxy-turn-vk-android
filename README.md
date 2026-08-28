@@ -20,7 +20,7 @@ qWDTT Client — сборка для тех, кому выдали готовы�
 
 ## Быстрый старт
 
-1. Скачайте APK в разделе [Releases](https://github.com/SpaceNeuroX/proxy-turn-vk-android/releases) — `qwdtt-…` для полной версии или `qwdtt-client-…`, если сервер настраивает кто-то другой.
+1. Скачайте APK в разделе [Releases](https://github.com/Wumurt/proxy-turn-vk-android/releases) — `qwdtt-…` для полной версии или `qwdtt-client-…`, если сервер настраивает кто-то другой.
 2. Добавьте VPS на вкладке «Серверы» и выполните установку серверной части (только в полной версии).
 3. Создайте профиль подключения или импортируйте готовую ссылку.
 4. Добавьте хеш звонка VK.
@@ -28,8 +28,8 @@ qWDTT Client — сборка для тех, кому выдали готовы�
 
 ## Сборки
 
-- стабильные подписанные версии публикуются в [GitHub Releases](https://github.com/SpaceNeuroX/proxy-turn-vk-android/releases);
-- тестовые debug-сборки ветки `develop` доступны в [GitHub Actions](https://github.com/SpaceNeuroX/proxy-turn-vk-android/actions/workflows/android-debug.yml).
+- стабильные подписанные версии публикуются в [GitHub Releases](https://github.com/Wumurt/proxy-turn-vk-android/releases);
+- тестовые debug-сборки ветки `develop` доступны в [GitHub Actions](https://github.com/Wumurt/proxy-turn-vk-android/actions/workflows/android-debug.yml).
 
 ## Обсуждение и поддержка
 

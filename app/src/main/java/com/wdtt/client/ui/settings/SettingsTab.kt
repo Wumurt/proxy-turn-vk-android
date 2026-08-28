@@ -1542,7 +1542,7 @@ fun SettingsTabContent(
 
                                 OutlinedButton(
                                     onClick = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SpaceNeuroX/proxy-turn-vk-android"))
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Wumurt/proxy-turn-vk-android"))
                                         context.startActivity(intent)
                                     },
                                     shape = RoundedCornerShape(8.dp),

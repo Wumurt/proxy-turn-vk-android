@@ -21,13 +21,22 @@ const val UPDATE_CHECK_NEVER = -1
 const val DEFAULT_UPDATE_CHECK_INTERVAL_HOURS = 12
 
 private const val UPDATE_LOG_TAG = "qWDTT"
-private const val GITHUB_RELEASES_URL = "https://api.github.com/repos/SpaceNeuroX/proxy-turn-vk-android/releases?per_page=30"
-private const val GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/SpaceNeuroX/proxy-turn-vk-android/releases/latest"
-private const val GITHUB_LATEST_RELEASE_WEB_URL = "https://github.com/SpaceNeuroX/proxy-turn-vk-android/releases/latest"
-private const val GITHUB_RELEASE_TAG_URL_PREFIX = "https://github.com/SpaceNeuroX/proxy-turn-vk-android/releases/tag/"
-private const val GITHUB_RELEASE_BY_TAG_URL_PREFIX = "https://api.github.com/repos/SpaceNeuroX/proxy-turn-vk-android/releases/tags/"
-private const val GITHUB_TAGS_URL = "https://api.github.com/repos/SpaceNeuroX/proxy-turn-vk-android/tags?per_page=100"
-private const val GITHUB_TAG_TREE_URL_PREFIX = "https://github.com/SpaceNeuroX/proxy-turn-vk-android/tree/"
+/**
+ * Репозиторий, из которого приложение берёт обновления.
+ *
+ * Вынесен в одну константу намеренно: раньше владелец и имя были продублированы
+ * в семи URL ниже, и при переезде форка легко пропустить часть из них — половина
+ * ссылок продолжила бы вести в чужой репозиторий.
+ */
+private const val GITHUB_REPO = "Wumurt/proxy-turn-vk-android"
+
+private const val GITHUB_RELEASES_URL = "https://api.github.com/repos/$GITHUB_REPO/releases?per_page=30"
+private const val GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
+private const val GITHUB_LATEST_RELEASE_WEB_URL = "https://github.com/$GITHUB_REPO/releases/latest"
+private const val GITHUB_RELEASE_TAG_URL_PREFIX = "https://github.com/$GITHUB_REPO/releases/tag/"
+private const val GITHUB_RELEASE_BY_TAG_URL_PREFIX = "https://api.github.com/repos/$GITHUB_REPO/releases/tags/"
+private const val GITHUB_TAGS_URL = "https://api.github.com/repos/$GITHUB_REPO/tags?per_page=100"
+private const val GITHUB_TAG_TREE_URL_PREFIX = "https://github.com/$GITHUB_REPO/tree/"
 private const val GITHUB_API_RATE_LIMIT_FALLBACK_MS = 30L * 60L * 1000L
 private val VERSION_NUMBER_REGEX = Regex("\\d+(?:\\.\\d+)*")
 
