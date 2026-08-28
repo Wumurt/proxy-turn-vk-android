@@ -344,7 +344,10 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         val supportShownFor = settingsStore.supportNoticeShownVersionCode.first()
         val currentCode = BuildConfig.VERSION_CODE
-        if (currentCode >= SettingsStore.SUPPORT_NOTICE_VERSION_CODE &&
+        // Окно существует ради ссылок на донат и Telegram-канал: если ни того,
+        // ни другого нет, показывать в нём нечего.
+        if ((AppLinks.hasDonate || AppLinks.hasTelegramChannel) &&
+            currentCode >= SettingsStore.SUPPORT_NOTICE_VERSION_CODE &&
             supportShownFor < SettingsStore.SUPPORT_NOTICE_VERSION_CODE
         ) {
             showSupportNotice = true
@@ -569,85 +572,73 @@ fun MainScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        "Готовые профили",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Вы можете получить готовые конфиги напрямую в этих Telegram-ботах:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/darkbit_vpnbot"))
-                                context.startActivity(intent)
-                            },
+                    if (AppLinks.hasConfigBots) {
+                        Text(
+                            "Готовые профили",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Вы можете получить готовые конфиги напрямую в этих Telegram-ботах:",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                "🤖 @darkbit_vpnbot",
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/sidylinkbot"))
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Text(
-                                "🤖 @sidylinkbot",
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelMedium
-                            )
+                            AppLinks.CONFIG_BOTS.forEach { botUrl ->
+                                Button(
+                                    onClick = {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(botUrl)))
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
+                                ) {
+                                    Text(
+                                        "🤖 " + AppLinks.handle(botUrl),
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Следите за обновлениями",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Все дальнейшие обновления и новости мы будем публиковать в нашем канале:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Button(
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppLinks.TELEGRAM_CHANNEL))
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(vertical = 10.dp)
-                    ) {
-                        Text("📢 @darkbitVPN", style = MaterialTheme.typography.labelLarge)
+                    if (AppLinks.hasTelegramChannel) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Следите за обновлениями",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Все дальнейшие обновления и новости мы будем публиковать в нашем канале:",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Button(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(AppLinks.TELEGRAM_CHANNEL))
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(vertical = 10.dp)
+                        ) {
+                            Text(
+                                "📢 " + AppLinks.handle(AppLinks.TELEGRAM_CHANNEL),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
                     Text(
                         "Просто скопируйте текст профиля или конфигурационный файл и импортируйте его на вкладке «Профили». Эта памятка также доступна в настройках.",

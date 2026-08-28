@@ -77,28 +77,32 @@ fun SupportNoticeDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                Button(
-                    onClick = { openUrl(AppLinks.DONATE_URL) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                ) {
-                    Text("Поддержать разработку")
+                if (AppLinks.hasDonate) {
+                    Button(
+                        onClick = { openUrl(AppLinks.DONATE_URL) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Text("Поддержать разработку")
+                    }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                if (AppLinks.hasTelegramChannel) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
 
-                Text(
-                    text = "Новости, обновления и помощь — в нашем Telegram-канале:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                    Text(
+                        text = "Новости, обновления и помощь — в нашем Telegram-канале:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
-                OutlinedButton(
-                    onClick = { openUrl(AppLinks.TELEGRAM_CHANNEL) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                ) {
-                    Text("📢 @darkbitVPN")
+                    OutlinedButton(
+                        onClick = { openUrl(AppLinks.TELEGRAM_CHANNEL) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                    ) {
+                        Text("📢 " + AppLinks.handle(AppLinks.TELEGRAM_CHANNEL))
+                    }
                 }
 
                 Button(
