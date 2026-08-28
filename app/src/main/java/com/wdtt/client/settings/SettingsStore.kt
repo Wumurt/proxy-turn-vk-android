@@ -376,8 +376,14 @@ class SettingsStore(context: Context) {
     val goDnsCustom: Flow<String> = dataStore.data.map { it[GO_DNS_CUSTOM] ?: "" }
     val goDnsDohCustom: Flow<String> = dataStore.data.map { it[GO_DNS_DOH_CUSTOM] ?: "" }
     val obfsMode: Flow<String> = dataStore.data.map { normalizeObfsMode(it[OBFS_MODE]) }
-    /** "admin" показывает вкладку Деплой; "user" скрывает. По умолчанию admin. */
+    /**
+     * "admin" показывает вкладку «Серверы»; "user" скрывает. По умолчанию admin.
+     *
+     * В клиентской сборке (qWDTT Client) админ-интерфейса нет вовсе, поэтому роль
+     * всегда "user" — что бы ни осталось в DataStore от импорта настроек.
+     */
     val interfaceRole: Flow<String> = dataStore.data.map {
+        if (!BuildConfig.ADMIN_UI) return@map "user"
         if ((it[INTERFACE_ROLE] ?: "admin").equals("user", ignoreCase = true)) "user" else "admin"
     }
     val captchaWbvSolveMethod: Flow<String> = dataStore.data.map { it[CAPTCHA_WBV_SOLVE_METHOD] ?: "auto" }

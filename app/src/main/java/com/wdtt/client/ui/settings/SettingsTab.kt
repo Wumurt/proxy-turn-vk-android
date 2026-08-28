@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +54,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wdtt.client.BuildConfig
+import com.wdtt.client.R
 import com.wdtt.client.PeerAddress
 import com.wdtt.client.BypassRoutes
 import com.wdtt.client.SettingsStore
@@ -1095,45 +1098,49 @@ fun SettingsTabContent(
                         }
                     }
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    // Раздел «Интерфейс» есть только в полной сборке: в qWDTT Client
+                    // переключать нечего — админ-интерфейса в этом APK нет.
+                    if (BuildConfig.ADMIN_UI) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                    // ═══ Раздел: Интерфейс ═══
-                    Text(
-                        "Интерфейс",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                        // ═══ Раздел: Интерфейс ═══
+                        Text(
+                            "Интерфейс",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            "Режим приложения",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "В режиме пользователя вкладка «Серверы» скрыта.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            ProtocolChip(
-                                label = "Пользователь",
-                                selected = interfaceRole == "user",
-                                enabled = true,
-                                modifier = Modifier.weight(1f)
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Режим приложения",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "В режиме пользователя вкладка «Серверы» скрыта.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                scope.launch { settingsStore.saveInterfaceRole("user") }
-                            }
-                            ProtocolChip(
-                                label = "Админ",
-                                selected = interfaceRole == "admin",
-                                enabled = true,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                scope.launch { settingsStore.saveInterfaceRole("admin") }
+                                ProtocolChip(
+                                    label = "Пользователь",
+                                    selected = interfaceRole == "user",
+                                    enabled = true,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    scope.launch { settingsStore.saveInterfaceRole("user") }
+                                }
+                                ProtocolChip(
+                                    label = "Админ",
+                                    selected = interfaceRole == "admin",
+                                    enabled = true,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    scope.launch { settingsStore.saveInterfaceRole("admin") }
+                                }
                             }
                         }
                     }
@@ -1503,7 +1510,7 @@ fun SettingsTabContent(
                         ) {
                             Column {
                                 Text(
-                                    text = "qWDTT",
+                                    text = stringResource(R.string.app_name),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1797,7 +1804,7 @@ fun SettingsTabContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "qWDTT",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.primary
             )

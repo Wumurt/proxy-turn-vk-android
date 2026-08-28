@@ -324,6 +324,13 @@ private fun enrichReleaseWithAssets(info: AppReleaseInfo): AppReleaseInfo? {
     )
 }
 
+/**
+ * Метка в имени релизного APK, отличающая клиентскую сборку от полной:
+ * `qwdtt-1.4.3-arm64-v8a.apk` — полная, `qwdtt-client-1.4.3-arm64-v8a.apk` — клиентская.
+ * Имена задаёт .github/workflows/android-release.yml.
+ */
+private const val CLIENT_APK_MARKER = "-client-"
+
 private fun pickApkAssetUrl(assets: JSONArray): String? {
     data class ApkAsset(val name: String, val url: String)
     val apks = mutableListOf<ApkAsset>()
@@ -335,9 +342,17 @@ private fun pickApkAssetUrl(assets: JSONArray): String? {
         apks += ApkAsset(name, url)
     }
     if (apks.isEmpty()) return null
-    return apks.firstOrNull { it.name.contains("universal", ignoreCase = true) }?.url
-        ?: apks.firstOrNull { it.name.contains("arm64", ignoreCase = true) }?.url
-        ?: apks.first().url
+
+    // У полной и клиентской сборок разные applicationId: чужой APK не обновит
+    // приложение, а поставится рядом как второе. Поэтому берём только «свои»
+    // файлы, а если их в релизе нет — не предлагаем обновление вовсе.
+    val wantClient = !BuildConfig.ADMIN_UI
+    val candidates = apks.filter { it.name.contains(CLIENT_APK_MARKER, ignoreCase = true) == wantClient }
+    if (candidates.isEmpty()) return null
+
+    return candidates.firstOrNull { it.name.contains("universal", ignoreCase = true) }?.url
+        ?: candidates.firstOrNull { it.name.contains("arm64", ignoreCase = true) }?.url
+        ?: candidates.first().url
 }
 
 private fun JSONObject.toAppReleaseInfo(): AppReleaseInfo? {

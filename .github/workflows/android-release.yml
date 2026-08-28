@@ -83,17 +83,27 @@ jobs:
         run: |
           mkdir -p dist
           version="${GITHUB_REF_NAME#v}"
-          found=0
-          for apk in app/build/outputs/apk/release/*.apk; do
+          # assembleRelease собирает оба флейвора: full (qWDTT) и lite (qWDTT Client).
+          # Имена файлов важны: клиент по метке "-client-" отличает свой APK от чужого
+          # (см. CLIENT_APK_MARKER в app/src/main/java/com/wdtt/client/update/AppUpdate.kt).
+          for apk in app/build/outputs/apk/*/release/*.apk; do
             test -f "$apk" || continue
             "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
-            base="$(basename "$apk")"
-            arch="${base#app-}"
-            arch="${arch%-release.apk}"
-            cp "$apk" "dist/qwdtt-${version}-${arch}.apk"
-            found=1
+            base="$(basename "$apk")"          # app-full-arm64-v8a-release.apk
+            rest="${base#app-}"                # full-arm64-v8a-release.apk
+            flavor="${rest%%-*}"               # full
+            arch="${rest#"$flavor"-}"          # arm64-v8a-release.apk
+            arch="${arch%-release.apk}"        # arm64-v8a
+            case "$flavor" in
+              full) name="qwdtt-${version}-${arch}.apk" ;;
+              lite) name="qwdtt-client-${version}-${arch}.apk" ;;
+              *) echo "Неизвестный флейвор в $base" >&2; exit 1 ;;
+            esac
+            cp "$apk" "dist/$name"
           done
-          test "$found" = 1
+          # обе сборки должны присутствовать в релизе
+          ls dist/qwdtt-"${version}"-*.apk >/dev/null
+          ls dist/qwdtt-client-"${version}"-*.apk >/dev/null
           cd dist
           sha256sum ./*.apk > SHA256SUMS.txt
 

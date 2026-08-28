@@ -24,10 +24,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.wdtt.client.R
 import com.wdtt.client.AppLinks
 
 @Composable
@@ -63,7 +65,7 @@ fun SupportNoticeDialog(
                     )
                     androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
                     Text(
-                        text = "qWDTT $versionName",
+                        text = "${stringResource(R.string.app_name)} $versionName",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )

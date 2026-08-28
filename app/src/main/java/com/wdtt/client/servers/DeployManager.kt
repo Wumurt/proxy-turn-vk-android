@@ -10,6 +10,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Активная SSH-сессия деплоя, отвязанная от конкретной библиотеки.
+ *
+ * [DeployManager] живёт в общем source set (его дёргает TunnelService при отмене
+ * установки), а сам SSH есть только в полной сборке — jsch подключён как
+ * fullImplementation. Поэтому тип сессии здесь абстрактный: полная сборка
+ * оборачивает в него com.jcraft.jsch.Session, клиентской он просто не нужен.
+ */
+fun interface DeploySession {
+    fun disconnect()
+}
+
 object DeployManager {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -18,7 +30,7 @@ object DeployManager {
     val currentStep = MutableStateFlow("")
 
     @Volatile
-    var activeSession: com.jcraft.jsch.Session? = null
+    var activeSession: DeploySession? = null
     private var deployStartTime = 0L
     private var errorsFile: File? = null
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())

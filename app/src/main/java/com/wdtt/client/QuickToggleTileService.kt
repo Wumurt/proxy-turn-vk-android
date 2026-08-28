@@ -62,13 +62,13 @@ class QuickToggleTileService : TileService() {
         val tile = qsTile ?: return
         if (running) {
             tile.state = Tile.STATE_ACTIVE
-            tile.label = "qWDTT: Вкл"
+            tile.label = "${getString(R.string.app_name)}: Вкл"
             if (Build.VERSION.SDK_INT >= 29) {
                 tile.subtitle = "Активен"
             }
         } else {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = "qWDTT: Выкл"
+            tile.label = "${getString(R.string.app_name)}: Выкл"
             if (Build.VERSION.SDK_INT >= 29) {
                 tile.subtitle = "Отключен"
             }

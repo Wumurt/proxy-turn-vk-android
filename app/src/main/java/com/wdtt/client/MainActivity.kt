@@ -295,7 +295,9 @@ fun MainScreen(
     )
     val includeBetaUpdates by settingsStore.includeBetaUpdates.collectAsStateWithLifecycle(initialValue = false)
     val interfaceRole by settingsStore.interfaceRole.collectAsStateWithLifecycle(initialValue = "admin")
-    val isAdminInterface = interfaceRole == "admin"
+    // В клиентской сборке ADMIN_UI = false на этапе компиляции: вкладка «Серверы»
+    // не появится независимо от того, что лежит в настройках.
+    val isAdminInterface = BuildConfig.ADMIN_UI && interfaceRole == "admin"
     val autoSwitchToLogs by settingsStore.autoSwitchToLogs.collectAsStateWithLifecycle(initialValue = true)
     var pendingSwitchToLogs by remember { mutableStateOf(false) }
     val activeNavItems = remember(isAdminInterface) {
@@ -523,7 +525,7 @@ fun MainScreen(
                             onConnectRequested = { pendingSwitchToLogs = true },
                             onOpenProfiles = { selectedTab = 2 },
                         )
-                        1 -> ServersTab()
+                        1 -> if (BuildConfig.ADMIN_UI) ServersTab()
                         2 -> ProfilesTab(
                             onProfileApplied = { selectedTab = 0 },
                             importFileUri = MainActivity.pendingFileUri.value,

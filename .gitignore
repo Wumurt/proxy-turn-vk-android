@@ -23,7 +23,7 @@ jniLibs/
 app/src/main/jniLibs/
 
 # ===== Server binary =====
-app/src/main/assets/server
+app/src/full/assets/server
 
 # ===== Keystore / Secrets =====
 *.keystore

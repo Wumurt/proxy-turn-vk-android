@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- targetPackage должен совпадать с applicationId флейвора full (net.qwdtt.client).
+     Ресурсы не поддерживают ${applicationId}, поэтому файл продублирован
+     в src/full и src/lite — правки нужно вносить в обе копии. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:shortcutId="shortcut_start_tunnel"

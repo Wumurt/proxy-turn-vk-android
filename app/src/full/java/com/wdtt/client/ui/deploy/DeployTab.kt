@@ -40,6 +40,7 @@ import com.jcraft.jsch.ChannelSftp
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
 import com.wdtt.client.DeployManager
+import com.wdtt.client.DeploySession
 import com.wdtt.client.ManagedServer
 import com.wdtt.client.ServersStore
 import com.wdtt.client.SettingsStore
@@ -1332,7 +1333,7 @@ private suspend fun performDeploy(
     try {
         onProgress(0.02f, "Подключение...")
         session = createSSHSession(host, user, port, sshAuth)
-        DeployManager.activeSession = session
+        DeployManager.activeSession = DeploySession { session.disconnect() }
         val ssh = SSHClient(session, sshAuth.sudoPassword)
 
         onProgress(0.05f, "Подготовка файлов...")
@@ -1497,7 +1498,7 @@ private suspend fun performUninstall(
     try {
         onProgress(0.05f, "Подключение...")
         session = createSSHSession(host, user, port, sshAuth)
-        DeployManager.activeSession = session
+        DeployManager.activeSession = DeploySession { session.disconnect() }
         val ssh = SSHClient(session, sshAuth.sudoPassword)
 
         onProgress(0.15f, "Остановка сервиса...")

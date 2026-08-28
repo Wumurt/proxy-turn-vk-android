@@ -19,7 +19,6 @@ android {
     compileSdk = 35
     
     defaultConfig {
-        applicationId = "net.qwdtt.client"
         minSdk = 28
         targetSdk = 35
         versionCode = 40
@@ -30,6 +29,30 @@ android {
             useSupportLibrary = true
         }
 
+    }
+
+    // ══ Сборки ══
+    // full — полное приложение (qWDTT): вкладка «Серверы», деплой на VPS, админ-панель.
+    // lite — клиент (qWDTT Client): только подключение. Админ-поверхность вырезана на
+    //        этапе компиляции (ADMIN_UI = false), включить её из приложения нечем.
+    // applicationId разный, поэтому обе сборки ставятся на телефон рядом.
+    flavorDimensions += "audience"
+
+    productFlavors {
+        create("full") {
+            dimension = "audience"
+            applicationId = "net.qwdtt.client"
+            buildConfigField("boolean", "ADMIN_UI", "true")
+            resValue("string", "app_name", "qWDTT")
+            resValue("string", "widget_label", "qWDTT Туннель")
+        }
+        create("lite") {
+            dimension = "audience"
+            applicationId = "net.qwdtt.client.lite"
+            buildConfigField("boolean", "ADMIN_UI", "false")
+            resValue("string", "app_name", "qWDTT Client")
+            resValue("string", "widget_label", "qWDTT Client Туннель")
+        }
     }
 
     splits {
@@ -112,6 +135,8 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // resValue в productFlavors (app_name / widget_label) — в AGP 9 фича выключена по умолчанию
+        resValues = true
     }
 
     lint {
@@ -145,7 +170,7 @@ tasks.register<Exec>("buildNativeLibs") {
 
 tasks.register<Exec>("buildServerAsset") {
     group = "build"
-    description = "Build Linux server binary and copy it into app assets"
+    description = "Build Linux server binary and copy it into full-flavor app assets"
     workingDir = rootDir
     environment("GOOS", "linux")
     environment("GOARCH", "amd64")
@@ -155,7 +180,7 @@ tasks.register<Exec>("buildServerAsset") {
         "build",
         "-trimpath",
         "-o",
-        rootDir.resolve("app/src/main/assets/server").absolutePath,
+        rootDir.resolve("app/src/full/assets/server").absolutePath,
         "./server",
     )
 }
@@ -180,7 +205,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("com.wireguard.android:tunnel:1.0.20230706")
-    implementation("com.github.mwiede:jsch:0.2.16")
+    // SSH-деплой есть только в полной сборке
+    // (строковая нотация: аксессор fullImplementation генерируется только
+    //  для флейворов, объявленных вне этого же скрипта)
+    "fullImplementation"("com.github.mwiede:jsch:0.2.16")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.webkit:webkit:1.12.1")
