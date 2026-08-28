@@ -70,10 +70,14 @@ if [[ ! -x "$CC" ]]; then
   exit 1
 fi
 
-echo "Refreshing Go checksums"
+# Раньше здесь выполнялся "go mod tidy -e": go.sum лежал в .gitignore, и набор
+# зависимостей пересобирался при каждой сборке. Подписанный APK получался из
+# непроверяемого набора модулей, а две сборки одного тега могли отличаться.
+# Теперь go.sum в репозитории, и go build сверяет контрольные суммы сам.
+echo "Verifying Go module checksums"
 (
   cd "$GO_DIR"
-  go mod tidy -e
+  go mod verify
 )
 
 OUT_DIR="$ROOT_DIR/app/src/main/jniLibs/$ABI"
@@ -84,10 +88,10 @@ echo "Building $ABI -> $OUT_DIR/libclient.so"
   cd "$GO_DIR"
   if needs_checklinkname_flag; then
     GOOS=android GOARCH="$GOARCH" CGO_ENABLED=1 CC="$CC" \
-      go build -trimpath -ldflags=-checklinkname=0 -o "$OUT_DIR/libclient.so" .
+      go build -mod=readonly -trimpath -ldflags=-checklinkname=0 -o "$OUT_DIR/libclient.so" .
   else
     GOOS=android GOARCH="$GOARCH" CGO_ENABLED=1 CC="$CC" \
-      go build -trimpath -o "$OUT_DIR/libclient.so" .
+      go build -mod=readonly -trimpath -o "$OUT_DIR/libclient.so" .
   fi
 )
 

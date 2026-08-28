@@ -15,9 +15,6 @@ gradle/gradle-daemon-jvm.properties
 app/build/
 app/release/
 
-# ===== Go =====
-go.sum
-
 # ===== Native Libraries (compiled) =====
 *.so
 *.dll

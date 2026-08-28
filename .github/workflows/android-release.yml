@@ -53,7 +53,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+        run: sdkmanager "platforms;android-35" "build-tools;36.0.0" "ndk;27.2.12479018"
 
       - name: Prepare signing key
         shell: bash
@@ -83,12 +83,15 @@ jobs:
         run: |
           mkdir -p dist
           version="${GITHUB_REF_NAME#v}"
+          # Не зашиваем номер build-tools: он растёт вместе с требованиями AGP.
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)apksigner"
+          test -x "$apksigner"
           # assembleRelease собирает оба флейвора: full (qWDTT) и lite (qWDTT Client).
           # Имена файлов важны: клиент по метке "-client-" отличает свой APK от чужого
           # (см. CLIENT_APK_MARKER в app/src/main/java/com/wdtt/client/update/AppUpdate.kt).
           for apk in app/build/outputs/apk/*/release/*.apk; do
             test -f "$apk" || continue
-            "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+            "$apksigner" verify --verbose "$apk"
             base="$(basename "$apk")"          # app-full-arm64-v8a-release.apk
             rest="${base#app-}"                # full-arm64-v8a-release.apk
             flavor="${rest%%-*}"               # full
