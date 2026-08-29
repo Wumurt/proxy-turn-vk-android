@@ -63,12 +63,40 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_BASE64"
-          test -n "$KEYSTORE_PASSWORD"
-          test -n "$KEY_ALIAS"
-          test -n "$KEY_PASSWORD"
+          # Раньше здесь стояли четыре голых "test -n": шаг падал молча на первом
+          # же пустом секрете, и по логу нельзя было понять, какого не хватает.
+          # Теперь называем сразу все отсутствующие и проверяем, что keystore
+          # вообще открывается — иначе сборка упала бы позже и невнятно.
+          missing=()
+          [ -n "$KEYSTORE_BASE64" ]   || missing+=(ANDROID_KEYSTORE_BASE64)
+          [ -n "$KEYSTORE_PASSWORD" ] || missing+=(ANDROID_KEYSTORE_PASSWORD)
+          [ -n "$KEY_ALIAS" ]         || missing+=(ANDROID_KEY_ALIAS)
+          [ -n "$KEY_PASSWORD" ]      || missing+=(ANDROID_KEY_PASSWORD)
+          if [ "${#missing[@]}" -ne 0 ]; then
+            for name in "${missing[@]}"; do
+              echo "::error title=Missing secret::$name is empty or not set"
+            done
+            echo "Add them in Settings -> Secrets and variables -> Actions." >&2
+            exit 1
+          fi
+
           keystore="$RUNNER_TEMP/qwdtt-release.jks"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          if ! printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore" 2>/dev/null; then
+            echo "::error title=Bad secret::ANDROID_KEYSTORE_BASE64 is not valid base64 (expected the output of: base64 -w0 your-release.jks)"
+            exit 1
+          fi
+
+          # Пароль подаём на stdin, а не через -storepass: аргументы процесса
+          # видны в списке процессов раннера.
+          if ! printf '%s\n' "$KEYSTORE_PASSWORD" | keytool -list -keystore "$keystore" >/dev/null 2>&1; then
+            echo "::error title=Cannot open keystore::check ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD"
+            exit 1
+          fi
+          if ! printf '%s\n' "$KEYSTORE_PASSWORD" | keytool -list -keystore "$keystore" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error title=Alias not found::ANDROID_KEY_ALIAS does not name a key in this keystore"
+            exit 1
+          fi
+
           printf '%s\n' \
             "KEYSTORE_FILE=$keystore" \
             "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" \
