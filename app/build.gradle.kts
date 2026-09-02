@@ -21,8 +21,8 @@ android {
     defaultConfig {
         minSdk = 28
         targetSdk = 35
-        versionCode = 41
-        versionName = "1.4.3"
+        versionCode = 42
+        versionName = "1.4.4"
 
         // Серверный бинарник не лежит в APK — он скачивается из релиза и
         // сверяется с этой суммой. Пусто (обычная локальная сборка) = деплой
