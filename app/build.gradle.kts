@@ -24,6 +24,22 @@ android {
         versionCode = 41
         versionName = "1.4.3"
 
+        // Серверный бинарник не лежит в APK — он скачивается из релиза и
+        // сверяется с этой суммой. Пусто (обычная локальная сборка) = деплой
+        // выключен: подписывать чужой исполняемый файл нечем.
+        // Задаётся из CI: -PserverSha256=<64 hex>. Необязательный -PserverUrl
+        // позволяет при отладке указать любой адрес вместо релизного.
+        buildConfigField(
+            "String",
+            "SERVER_SHA256",
+            "\"" + (providers.gradleProperty("serverSha256").orNull ?: "").trim().lowercase() + "\"",
+        )
+        buildConfigField(
+            "String",
+            "SERVER_URL",
+            "\"" + (providers.gradleProperty("serverUrl").orNull ?: "").trim() + "\"",
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -168,26 +184,32 @@ tasks.register<Exec>("buildNativeLibs") {
     )
 }
 
-tasks.register<Exec>("buildServerAsset") {
+// Собирает серверный бинарник в build/, а НЕ в assets приложения: в APK он
+// больше не попадает. Публикуется отдельным файлом релиза, приложение скачивает
+// его оттуда. Намеренно не подключён к preBuild — сборке APK он не нужен.
+tasks.register<Exec>("buildServerBinary") {
     group = "build"
-    description = "Build Linux server binary and copy it into full-flavor app assets"
+    description = "Build the Linux server binary into build/server (published as a release asset)"
     workingDir = rootDir
     environment("GOOS", "linux")
     environment("GOARCH", "amd64")
     environment("CGO_ENABLED", "0")
+    val output = layout.buildDirectory.file("server/wdtt-server-linux-amd64")
+    outputs.file(output)
+    doFirst { output.get().asFile.parentFile.mkdirs() }
     commandLine(
         "go",
         "build",
         "-trimpath",
+        "-ldflags=-s -w",
         "-o",
-        rootDir.resolve("app/src/full/assets/server").absolutePath,
+        output.get().asFile.absolutePath,
         "./server",
     )
 }
 
 tasks.named("preBuild").configure {
     dependsOn("buildNativeLibs")
-    dependsOn("buildServerAsset")
 }
 
 dependencies {

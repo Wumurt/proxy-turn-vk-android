@@ -23,7 +23,9 @@ jniLibs/
 app/src/main/jniLibs/
 
 # ===== Server binary =====
-app/src/full/assets/server
+# Собирается задачей buildServerBinary и публикуется файлом релиза,
+# в APK не попадает (см. ServerBinary.kt).
+app/build/server/
 
 # ===== Keystore / Secrets =====
 *.keystore

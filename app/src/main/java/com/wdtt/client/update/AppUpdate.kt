@@ -21,14 +21,9 @@ const val UPDATE_CHECK_NEVER = -1
 const val DEFAULT_UPDATE_CHECK_INTERVAL_HOURS = 12
 
 private const val UPDATE_LOG_TAG = "qWDTT"
-/**
- * Репозиторий, из которого приложение берёт обновления.
- *
- * Вынесен в одну константу намеренно: раньше владелец и имя были продублированы
- * в семи URL ниже, и при переезде форка легко пропустить часть из них — половина
- * ссылок продолжила бы вести в чужой репозиторий.
- */
-private const val GITHUB_REPO = "Wumurt/proxy-turn-vk-android"
+// Владелец и имя репозитория живут в AppLinks.GITHUB_REPO: их используют и
+// обновления, и загрузка серверного бинарника при деплое.
+private const val GITHUB_REPO = AppLinks.GITHUB_REPO
 
 private const val GITHUB_RELEASES_URL = "https://api.github.com/repos/$GITHUB_REPO/releases?per_page=30"
 private const val GITHUB_LATEST_RELEASE_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"

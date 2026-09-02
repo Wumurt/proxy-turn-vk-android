@@ -103,13 +103,30 @@ jobs:
             "KEY_ALIAS=$KEY_ALIAS" \
             "KEY_PASSWORD=$KEY_PASSWORD" > local.properties
 
+      - name: Build server binary
+        shell: bash
+        run: |
+          # Бинарник больше не лежит в APK: он публикуется файлом релиза, а
+          # приложение скачивает его и сверяет с этой суммой (ServerBinary.kt).
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          out="dist/wdtt-server-${version}-linux-amd64"
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+            go build -trimpath -ldflags="-s -w" -o "$out" ./server
+          sha="$(sha256sum "$out" | cut -d' ' -f1)"
+          echo "SERVER_SHA256=$sha" >> "$GITHUB_ENV"
+          echo "$out -> sha256 $sha"
+
       - name: Build release APKs
-        run: ./gradlew :app:assembleRelease -PtargetAbis=arm64-v8a,armeabi-v7a,x86_64 --no-daemon
+        run: |
+          ./gradlew :app:assembleRelease \
+            -PtargetAbis=arm64-v8a,armeabi-v7a,x86_64 \
+            -PserverSha256="$SERVER_SHA256" \
+            --no-daemon
 
       - name: Verify and name APKs
         shell: bash
         run: |
-          mkdir -p dist
           version="${GITHUB_REF_NAME#v}"
           # Не зашиваем номер build-tools: он растёт вместе с требованиями AGP.
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)apksigner"
@@ -136,7 +153,11 @@ jobs:
           ls dist/qwdtt-"${version}"-*.apk >/dev/null
           ls dist/qwdtt-client-"${version}"-*.apk >/dev/null
           cd dist
-          sha256sum ./*.apk > SHA256SUMS.txt
+          # Сервер тоже попадает в список: пользователю может понадобиться
+          # сверить его отдельно от APK.
+          sha256sum ./*.apk ./wdtt-server-* > SHA256SUMS.txt
+          # Страховка от рассинхрона: в APK вшита та же сумма, что у файла релиза.
+          grep -qi "$SERVER_SHA256" SHA256SUMS.txt
 
       - name: Publish GitHub Release
         shell: bash

@@ -41,6 +41,7 @@ import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
 import com.wdtt.client.DeployManager
 import com.wdtt.client.DeploySession
+import com.wdtt.client.ServerBinary
 import com.wdtt.client.ManagedServer
 import com.wdtt.client.ServersStore
 import com.wdtt.client.SettingsStore
@@ -1340,10 +1341,8 @@ private suspend fun performDeploy(
         val dnsServers = "${if(dns1.isNotBlank()) dns1 else "1.1.1.1"}${if(dns2.isNotBlank()) ",$dns2" else ""}"
 
         val scriptFile = File(context.cacheDir, "deploy.sh")
-        val serverFile = File(context.cacheDir, "server")
         try {
             context.assets.open("deploy.sh").use { inp -> FileOutputStream(scriptFile).use { out -> inp.copyTo(out) } }
-            context.assets.open("server").use { inp -> FileOutputStream(serverFile).use { out -> inp.copyTo(out) } }
             FileOutputStream(adminTokenFile).use { it.write(adminApiToken.toByteArray(Charsets.UTF_8)) }
             FileOutputStream(mainPasswordFile).use { it.write(mainPass.toByteArray(Charsets.UTF_8)) }
             FileOutputStream(botTokenFile).use { it.write(botToken.toByteArray(Charsets.UTF_8)) }
@@ -1352,11 +1351,24 @@ private suspend fun performDeploy(
             DeployManager.stopDeploy("Ошибка: файлы не найдены в assets")
             return@withContext DeployResult(false)
         }
+
+        // Сам сервер в APK не лежит — он скачивается из релиза и сверяется по
+        // вшитой SHA-256. Файл кэшируется, поэтому удалять его после заливки
+        // нельзя: следующий деплой возьмёт его из кэша.
+        val serverFile = try {
+            ServerBinary.obtain(context) { fraction, step ->
+                onProgress(0.05f + 0.01f * fraction, step)
+            }
+        } catch (e: Exception) {
+            scriptFile.delete()
+            DeployManager.writeError("Server binary unavailable: ${e.message}")
+            DeployManager.stopDeploy(e.message ?: "Не удалось получить серверный файл")
+            return@withContext DeployResult(false)
+        }
         if (isUnsafeLegacyServerAsset(serverFile)) {
             scriptFile.delete()
-            serverFile.delete()
-            DeployManager.writeError("Unsafe legacy server asset: найдено wg0 или /etc/wireguard. Нужна пересборка server под wdtt0 и /etc/wdtt.")
-            DeployManager.stopDeploy("Нужна пересборка server asset")
+            DeployManager.writeError("Unsafe legacy server binary: найдено wg0 или /etc/wireguard. Нужна пересборка server под wdtt0 и /etc/wdtt.")
+            DeployManager.stopDeploy("Серверный файл несовместим")
             return@withContext DeployResult(false)
         }
 
@@ -1367,7 +1379,6 @@ private suspend fun performDeploy(
         ssh.upload(mainPasswordFile, "/tmp/wdtt-main.password")
         ssh.upload(botTokenFile, "/tmp/wdtt-bot.token")
         scriptFile.delete()
-        serverFile.delete()
         adminTokenFile.delete()
         mainPasswordFile.delete()
         botTokenFile.delete()

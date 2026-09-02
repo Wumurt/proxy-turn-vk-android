@@ -8,6 +8,9 @@ package com.wdtt.client
  * подписи кнопок выводятся из самого адреса, экраны править не нужно.
  */
 object AppLinks {
+    /** Репозиторий проекта: отсюда берутся и обновления, и серверный бинарник. */
+    const val GITHUB_REPO = "Wumurt/proxy-turn-vk-android"
+
     /** Telegram-канал проекта. Пусто — блоки со ссылкой на канал скрыты. */
     const val TELEGRAM_CHANNEL = ""
 
